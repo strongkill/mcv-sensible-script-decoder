@@ -47,7 +47,7 @@ func main() {
 		v2.POST("/script-decoder", Decoder)
 	}
 
-	_ = router.Run(util.AddStr("0.0.0.0:", "3000"))
+	_ = router.Run(util.AddStr("0.0.0.0:", "9030"))
 
 }
 
