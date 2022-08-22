@@ -1,4 +1,4 @@
-module github.com/ShowPay/showMonitor/script-decoder
+module github.com/ShowPay/script-decoder
 
 go 1.17
 
