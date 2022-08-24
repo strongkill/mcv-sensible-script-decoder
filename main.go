@@ -72,7 +72,7 @@ func Cors() gin.HandlerFunc {
 }
 
 func main() {
-
+	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 	router.Use(Cors())
 	v2 := router.Group("/v1/mvc-browser")

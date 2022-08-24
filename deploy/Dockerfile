@@ -1,4 +1,4 @@
-#showMonitor
+#mvc-script-decoder
 FROM golang:latest
 ENV GO_FILE_PATH /mnt/app
 MAINTAINER  kyle "keung@showpay.top"
