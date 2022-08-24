@@ -1,12 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
-	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/godaddy-x/jorm/util"
 	scriptDecoder "github.com/metasv/metacontract-script-decoder"
-	"log"
 	"net/http"
 )
 
@@ -16,7 +15,41 @@ type Message struct {
 }
 
 type ScriptMode struct {
-	Hex string `json:"hex" bson:"hex" binding:"required"`
+	Type string `json:"type" bson:"type" binding:"required"`
+	Hex  string `json:"hex" bson:"hex" binding:"required"`
+}
+type MetaId struct {
+	Protocol string `json:"protocol"`
+	Data     string `json:"data"`
+}
+
+func getMetaIdProtocol(pkScript []byte) []byte {
+	script := pkScript[:len(pkScript)-5]
+	flagTagStart := bytes.IndexByte(script, scriptDecoder.OP_DATA_26)
+	flagTagend := bytes.IndexByte(script, scriptDecoder.OP_DATA_2)
+	return script[flagTagStart+1 : flagTagend]
+}
+func getMetaIdFlag(pkScript []byte) []byte {
+	script := pkScript[:len(pkScript)-5]
+	flagTagStart := bytes.IndexByte(script, scriptDecoder.OP_DATA_6)
+	flagTagend := bytes.IndexByte(script, scriptDecoder.OP_DATA_26)
+	return script[flagTagStart+1 : flagTagend]
+}
+func hasMetaIdFlag(pkScript []byte) bool {
+	return bytes.Equal(getMetaIdFlag(pkScript), []byte("metaid"))
+	//return bytes.Contains(script,[]byte("metaid"))
+}
+
+func DecodeMetaId(pkScript []byte, metaId *MetaId) bool {
+
+	ret := false
+	if hasMetaIdFlag(pkScript) {
+		metaId.Protocol = string(getMetaIdProtocol(pkScript))
+		metaId.Data = string(pkScript)
+		ret = true
+	}
+
+	return ret
 }
 
 func Cors() gin.HandlerFunc {
@@ -52,6 +85,12 @@ func main() {
 }
 
 func Decoder(context *gin.Context) {
+	origin := context.Request.Header.Get("Origin")
+	if origin != "https://api-mvc.metasv.com" {
+		context.JSONP(http.StatusInternalServerError, Message{Code: 1, Data: "ERROR"})
+		return
+	}
+
 	var scriptMode ScriptMode
 	if err := context.ShouldBindJSON(&scriptMode); err != nil {
 		context.JSONP(http.StatusInternalServerError, Message{Code: 1, Data: "Request params is empty"})
@@ -63,14 +102,22 @@ func Decoder(context *gin.Context) {
 			if err != nil {
 				return
 			}
+			switch scriptMode.Type {
+			case "metaid":
+				metaId := &MetaId{}
+				DecodeMetaId(script, metaId)
+				//log.Printf("%v",metaId)
+				context.JSONP(http.StatusOK, gin.H{"code": 0, "data": metaId})
+			default:
+				txo := &scriptDecoder.TxoData{}
 
-			txo := &scriptDecoder.TxoData{}
+				scriptDecoder.DecodeMvcTxo(script, txo)
 
-			scriptDecoder.DecodeMvcTxo(script, txo)
+				//data, _ := json.Marshal(txo)
+				//log.Printf("%v", string(data))
+				context.JSONP(http.StatusOK, gin.H{"code": 0, "data": txo})
+			}
 
-			data, _ := json.Marshal(txo)
-			log.Printf("%v", string(data))
-			context.JSONP(http.StatusOK, gin.H{"code": 0, "data": txo})
 		}
 	}
 }
